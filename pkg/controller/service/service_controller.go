@@ -189,30 +189,30 @@ func (r *ReconcileService) Reconcile(request reconcile.Request) (reconcile.Resul
 	}
 
 	/*
-		There is a representation invariant that is maintained by this code.
-		When the Status.InstanceID is set, then the Plan, ServiceClass are also set in the Status,
-		and together they point to a service in Bluemix that has been deployed and that
-		is managed by this controller.
+	 There is a representation invariant that is maintained by this code.
+	 When the Status.InstanceID is set, then the Plan, ServiceClass are also set in the Status,
+	 and together they point to a service in Bluemix that has been deployed and that
+	 is managed by this controller.
 
-		The job of the Reconciler is to maintain this invariant.
+	 The job of the Reconciler is to maintain this invariant.
 	*/
 
 	/*
-		In the following code, we first check if the serviceClassType is CF or not.
-		In both cases, we first check if the InstanceID has been set in Status.
-		If not, we try to create the service on Bluemix. If InstanceID has been set,
-		then we verify that the service still exists on Bluemix and recreate it if necessary.
+	 In the following code, we first check if the serviceClassType is CF or not.
+	 In both cases, we first check if the InstanceID has been set in Status.
+	 If not, we try to create the service on Bluemix. If InstanceID has been set,
+	 then we verify that the service still exists on Bluemix and recreate it if necessary.
 
-		For non-CF resources, before creating we set the InstanceID to "IN PROGRESS".
-		This is to mitigate a potential data race that could cause the service to
-		be created more than once on Bluemix (with the same name, but different InstanceIDs).
-		CF services do not allow multiple services with the same name, so this is not needed.
+	 For non-CF resources, before creating we set the InstanceID to "IN PROGRESS".
+	 This is to mitigate a potential data race that could cause the service to
+	 be created more than once on Bluemix (with the same name, but different InstanceIDs).
+	 CF services do not allow multiple services with the same name, so this is not needed.
 
-		When the service is created (or recreated), we update the Status fields to reflect
-		the external state. If this update fails (because the underlying etcd instance was modified),
-		then we restore the invariant by deleting the external resource that was created.
-		In this case, another run of the Reconcile method will make the external state consistent with
-		the updated spec.
+	 When the service is created (or recreated), we update the Status fields to reflect
+	 the external state. If this update fails (because the underlying etcd instance was modified),
+	 then we restore the invariant by deleting the external resource that was created.
+	 In this case, another run of the Reconcile method will make the external state consistent with
+	 the updated spec.
 	*/
 
 	externalName := getExternalName(instance)
@@ -225,8 +225,8 @@ func (r *ReconcileService) Reconcile(request reconcile.Request) (reconcile.Resul
 			// check if using the alias plan, in that case we need to use the existing instance
 			if strings.ToLower(instance.Spec.Plan) == aliasPlan {
 				logt.Info("Using `Alias` plan, checking if instance exists")
-				// TODO - should use external name if defined
-				serviceInstance, err := serviceInstanceAPI.FindByName(instance.ObjectMeta.Name)
+
+				serviceInstance, err := serviceInstanceAPI.FindByName(externalName)
 				if err != nil {
 					logt.Error(err, "Instance ", instance.ObjectMeta.Name, " with `Alias` plan does not exists")
 					return r.updateStatusError(instance, "Failed", err)
@@ -294,7 +294,7 @@ func (r *ReconcileService) Reconcile(request reconcile.Request) (reconcile.Resul
 					// Warning: Do not add the ServiceID to this query
 					ResourceGroupID: ibmCloudInfo.ResourceGroupID,
 					ServicePlanID:   ibmCloudInfo.ServicePlanID,
-					Name:            instance.ObjectMeta.Name,
+					Name:            externalName,
 				}
 
 				serviceInstances, err := resServiceInstanceAPI.ListInstances(serviceInstanceQuery)
